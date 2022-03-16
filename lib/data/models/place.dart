@@ -5,45 +5,47 @@ import 'dart:ffi';
 
 import 'package:flutter/foundation.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:jame3ty_map/data/models/vertex.dart';
-import 'package:jame3ty_map/data/models/vertex.dart';
+import 'package:jame3ty_map/data/models/place.dart';
+import 'package:jame3ty_map/data/models/place.dart';
 
 import 'edge.dart';
 
-class Place implements Comparable<Place>{
+class Place implements Comparable<Place> {
   final LatLng latLng;
   final String name;
-  List<Edge>  adjacenciesList = [];
-  bool visited = false ;
-  Place?  predecessor ;
-  final bool isVisible ;
+  List<Edge> adjacenciesList = [];
+  bool visited = false;
+  Place? predecessor;
+  final bool isVisible;
   double distance = double.maxFinite;
   Place({required this.isVisible, required this.name, required this.latLng});
 
-  void setVertex(Place vertex){
+  void setVertex(Place vertex) {
     predecessor = vertex;
   }
 
-  Place? getPredecessor(){
+  Place? getPredecessor() {
     return predecessor;
   }
 
   @override
   int compareTo(Place other) {
-    if(distance < other.distance){
+    if (distance < other.distance) {
       return -4;
-    }else if(distance > other.distance){
+    } else if (distance > other.distance) {
       return 4;
-    }else{
+    } else {
       return 0;
     }
   }
+
   @override
   String toString() {
     // TODO: implement toString
     return name;
   }
 
-  
+  factory Place.fromJson(Map<String, dynamic> json) {
+    return Place(isVisible: json["isVisible"], name: json["name"], latLng: LatLng(json["lat"],json["lng"]));
+  }
 }
-

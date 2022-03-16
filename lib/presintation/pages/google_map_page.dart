@@ -1,11 +1,13 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/data_sources/dijkstraShortestPath.dart';
-import '../../data/models/vertex.dart';
+import '../../data/models/place.dart';
 
 class GoogleMapScreen extends StatefulWidget {
   const GoogleMapScreen({Key? key}) : super(key: key);
@@ -18,9 +20,10 @@ class _GoogleMapScreenState extends State<GoogleMapScreen> {
   late GoogleMapController mapController;
   final Location location = Location();
   late LatLng latLng;
+  var _map_style;
 
   var initialCameraPosition = const CameraPosition(
-    target: LatLng(33.396092, 6.858969),
+    target: LatLng(33.354037, 6.809174),
     zoom: 18.0,
   );
 
@@ -31,13 +34,34 @@ class _GoogleMapScreenState extends State<GoogleMapScreen> {
 
   @override
   void initState() {
-    location.onLocationChanged.listen((event) {});
+    // SchedulerBinding.instance?.addPostFrameCallback((_) {
+    //   rootBundle.loadString("map_style.txt").then((string) {
+    //     _map_style = string;
+    //   });
+    // });
+
+
+
     _getMarks();
+    _computeDistance();
   }
 
-  void _onMapCreated(GoogleMapController controller) {
+  void _onMapCreated(GoogleMapController controller) async {
+    var locatioinData = await location.getLocation();
     mapController = controller;
+    _map_style = await rootBundle.loadString('assets/style/map_style.txt');
+    mapController.setMapStyle(_map_style);
+    mapController.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
+        target: LatLng(locatioinData.latitude ?? 33.354037,
+            locatioinData.longitude ?? 6.809174),
+        zoom: 18.0)));
   }
+
+  // void _onMapCreated(GoogleMapController controller) {
+  //
+  //   mapController = controller;
+  //
+  // }
 
   @override
   void dispose() {
@@ -50,6 +74,9 @@ class _GoogleMapScreenState extends State<GoogleMapScreen> {
     return Scaffold(
       body: Container(
         child: GoogleMap(
+          mapToolbarEnabled: true,
+          myLocationEnabled: true,
+          mapType: MapType.normal,
           zoomControlsEnabled: false,
           circles: mapCircle.toSet(),
           onMapCreated: _onMapCreated,
@@ -59,37 +86,39 @@ class _GoogleMapScreenState extends State<GoogleMapScreen> {
           onLongPress: (it) {},
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Theme.of(context).primaryColor,
-        foregroundColor: Colors.white,
-        onPressed: getCurrentLocation,
-        child: const Icon(Icons.my_location_sharp),
-      ),
+      // floatingActionButton: FloatingActionButton(
+      //   backgroundColor: Theme.of(context).primaryColor,
+      //   foregroundColor: Colors.white,
+      //   onPressed: getCurrentLocation,
+      //   child: const Icon(Icons.my_location_sharp),
+      // ),
     );
   }
 
   _getMarks() {
     Provider.of<DijkstraShortestPath>(context, listen: false)
-        .data
-        .places
-        .forEach((element) {
-      var mark = Marker(
-          markerId: MarkerId(element.name),
-          infoWindow: InfoWindow(title: element.name),
-          draggable: false,
-          position: LatLng(element.latLng.latitude, element.latLng.longitude),
-          visible: element.isVisible,
-          onTap: () {
-            _drawPloyLine(element);
-          },
-          icon:
-              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen));
-      mapMarkers.add(mark);
+        .jsonData
+        ?.forEach((element) {
+         if(element.isVisible){
+           var mark = Marker(
+               markerId: MarkerId(element.name),
+               infoWindow: InfoWindow(title: element.name),
+               draggable: false,
+               position: LatLng(element.latLng.latitude, element.latLng.longitude),
+               visible: element.isVisible,
+               onTap: () {
+                 _drawPloyLine(element);
+               },
+               icon:
+               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan));
+           mapMarkers.add(mark);
+         }
     });
   }
 
   _drawPloyLine(Place place) {
     List<LatLng> points = [];
+    points.add(latLng);
     Provider.of<DijkstraShortestPath>(context, listen: false)
         .getShortestPathTo(place)
         .then((value) => {
@@ -97,18 +126,18 @@ class _GoogleMapScreenState extends State<GoogleMapScreen> {
                 points.add(element.latLng);
                 print(element.name);
               }),
-              polylins.add(
-                Polyline(
-                    polylineId: const PolylineId("dots"),
-                    color: Colors.red,
-                    points: [
-                      LatLng(latLng.latitude, latLng.longitude),
-                      LatLng(points.first.latitude, points.first.longitude)
-                    ],
-                    patterns: const [
-                      PatternItem.dot
-                    ]),
-              )
+              // polylins.add(
+              //   Polyline(
+              //       polylineId: const PolylineId("dots"),
+              //       color: Colors.red,
+              //       points: [
+              //         LatLng(latLng.latitude, latLng.longitude),
+              //         LatLng(points.first.latitude, points.first.longitude)
+              //       ],
+              //       patterns: const [
+              //         PatternItem.dot
+              //       ]),
+              // )
             });
 
     var polyline = Polyline(
@@ -125,25 +154,36 @@ class _GoogleMapScreenState extends State<GoogleMapScreen> {
     mapController.animateCamera(CameraUpdate.newCameraPosition(
         CameraPosition(target: latLng, zoom: 18.0)));
     var marker = Marker(
-        markerId: const MarkerId("markerId"),
-        position:
-            LatLng(locationData.latitude ?? 0, locationData.longitude ?? 0),
-        icon:
-            BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
+      markerId: const MarkerId("markerId"),
+      position: LatLng(locationData.latitude ?? 0, locationData.longitude ?? 0),
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
     );
 
-    // var circle = Circle(
-    //     circleId: CircleId("circleId"),
-    //     center: latLng,
-    //     strokeWidth: 10,
-    //     fillColor: Colors.blue,
-    //     strokeColor: Colors.blueAccent);
-   // mapCircle.add(circle);
+    var circle = Circle(
+        circleId: const CircleId("circleId"),
+        center: latLng,
+        strokeWidth: 10,
+        fillColor: Colors.blue,
+        strokeColor: Colors.blueAccent);
+    mapCircle.add(circle);
     mapMarkers.add(marker);
     setState(() {});
   }
 
-  Future<void> getCurrentLocation() async {
+  // Future<void> getCurrentLocation() async {
+  //   location.getLocation().then((value) => {
+  //         Provider.of<DijkstraShortestPath>(context, listen: false)
+  //             .computeShortestPaths(
+  //                 LatLng(value.latitude ?? 0, value.longitude ?? 0)),
+  //         latLng = LatLng(value.latitude!, value.longitude!),
+  //         upDataLocation(value)
+  //       });
+  //   location.onLocationChanged.listen((event) {
+  //     // upDataLocation(event);
+  //   });
+  // }
+
+  _computeDistance() async {
     location.getLocation().then((value) => {
           Provider.of<DijkstraShortestPath>(context, listen: false)
               .computeShortestPaths(
@@ -151,8 +191,6 @@ class _GoogleMapScreenState extends State<GoogleMapScreen> {
           latLng = LatLng(value.latitude!, value.longitude!),
           upDataLocation(value)
         });
-    location.onLocationChanged.listen((event) {
-      // upDataLocation(event);
-    });
   }
+
 }
